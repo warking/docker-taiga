@@ -1,0 +1,74 @@
+version: "3"
+services:
+  rabbitmq:
+    image: rabbitmq:3
+    container_name: taiga-rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: taiga
+      RABBITMQ_DEFAULT_PASS: taiga
+      RABBITMQ_DEFAULT_VHOST: taiga
+  db:
+    image: postgres
+    container_name: taiga-db
+    restart: always
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: taiga
+      POSTGRES_PASSWORD: taiga
+      POSTGRES_USER: taiga
+      TZ: Asia/Shanghai
+  taiga-front:
+    build: taiga-front
+    container_name: taiga-front
+    depends_on:
+      - taiga-back
+      - taiga-event
+    restart: always
+    volumes: 
+      - ./taiga/media:/home/taiga/media
+      - ./taiga/static:/home/taiga/static
+    environment:
+      TAIGA_EVENT_HOST: taiga-event
+      TAIGA_BACK_HOST: taiga-back
+      TAIGA_EVENT_PUBLIC_HOST: "wss://taiga.com"
+      TAIGA_BACK_PUBLIC_HOST: "https://taiga.com"
+    ports:
+      - 80:80
+  taiga-event:
+    build: taiga-event
+    container_name: taiga-event
+    depends_on:
+      - rabbitmq
+    restart: always
+    environment:
+      SECRET_KEY: thisissecret
+      RABBITMQ_HOST: rabbitmq
+  taiga-back:
+    build: taiga-back
+    container_name: taiga-back
+    depends_on:
+      - db
+      - rabbitmq
+    restart: always
+    volumes: 
+      - ./taiga/media:/home/taiga/media
+      - ./taiga/static:/home/taiga/static
+    environment:
+      DB_HOST: db
+      FRONT_SCHEME: https
+      FRONT_DOMAIN: taiga.com
+      SECRET_KEY: thisissecret
+      PUBLIC_REGISTER_ENABLED: "False"
+      EMAIL: taiga.noreply@taiga.com
+      RABBITMQ_HOST: rabbitmq
+      TLS_ENABLED: "True"
+      SMTP_SERVER: smtp.gmail.com
+      EMAIL_USER: taiga.noreply@taiga.com
+      EMAIL_PASSWORD: "smtppassword"
+      SMTP_PORT: 587
+networks:
+  default:
+    external:
+      name: taiga_network
